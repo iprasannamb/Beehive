@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   call-labeler:
-    uses: shivamyadav-org/.github/.github/workflows/labeler.yml@main
+    uses: KathiraveluLab/.github/.github/workflows/labeler.yml@main
     with:
       issue_title: ${{ github.event.issue.title }}
       issue_body: ${{ github.event.issue.body }}
