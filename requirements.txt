@@ -14,7 +14,7 @@ pymongo==4.11.0
 dnspython==2.7.0
 
 # Authentication & OAuth
-Authlib==1.6.9
+Authlib==1.6.11
 google-api-core==2.24.1
 google-api-python-client==2.160.0
 google-auth==2.38.0
