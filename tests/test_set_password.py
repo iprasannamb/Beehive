@@ -182,7 +182,7 @@ def test_set_password_signup_username_collision_resolved(mock_token, mock_db, mo
     otp_record = {
         "email": "alice@example.com",
         "verified": True,
-        "verified_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        "verified_at": datetime.now(timezone.utc),
     }
 
     inserted_doc = MagicMock(inserted_id="new-id-456")
