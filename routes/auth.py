@@ -27,6 +27,22 @@ auth_bp = Blueprint("auth", __name__)
 OTP_VERIFICATION_WINDOW_SECONDS = 600  # 10 minutes
 
 
+def _unique_username(base: str) -> str:
+    """Return a username derived from *base* that does not already exist.
+
+    Strips any '@' character so the result can never be mistaken for an email
+    address by the login resolver, then appends an incrementing numeric suffix
+    until a free slot is found.
+    """
+    base = base.replace("@", "")
+    candidate = base
+    counter = 1
+    while db.users.find_one({"username": candidate}):
+        candidate = f"{base}{counter}"
+        counter += 1
+    return candidate
+
+
 def _validate_otp_verification(email: str):
     """Check that a valid, unexpired OTP verification session exists for email.
 
@@ -331,9 +347,10 @@ def set_password():
         role = "admin" if is_admin_email(email) else "user"
 
         now_utc = datetime.now(timezone.utc)
+        username = _unique_username(email.split("@")[0])
         user_id = db.users.insert_one({
             "email": email,
-            "username": email.split("@")[0],
+            "username": username,
             "password": hashed,
             "role": role,
             "created_at": now_utc,
@@ -415,9 +432,10 @@ def google_auth():
 
         # Create a minimal Google-backed user (no local password)
         now_utc = datetime.now(timezone.utc)
+        google_username = _unique_username(name or email.split("@")[0])
         result = db.users.insert_one({
             "email": email,
-            "username": name or email.split("@")[0],
+            "username": google_username,
             "password": None,
             "role": role,
             "provider": "google",
