@@ -166,3 +166,82 @@ def test_set_password_signup_duplicate_email(mock_db, client):
     assert resp.status_code == 400
     data = resp.get_json()
     assert data["error"] == "User already exists"
+
+
+# ---------------------------------------------------------------------------
+# Tests — username collision handling
+# ---------------------------------------------------------------------------
+
+
+@patch("routes.auth.is_admin_email", return_value=False)
+@patch("routes.auth.db")
+@patch("routes.auth.create_access_token", return_value="mock-jwt-token")
+def test_set_password_signup_username_collision_resolved(mock_token, mock_db, mock_admin, client):
+    """When the email prefix is already taken as a username, _unique_username
+    must generate a suffixed variant instead of silently inserting a duplicate."""
+    otp_record = {
+        "email": "alice@example.com",
+        "verified": True,
+        "verified_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+    }
+
+    inserted_doc = MagicMock(inserted_id="new-id-456")
+    mock_db.users.insert_one.return_value = inserted_doc
+
+    # Simulate: first find_one (existing-user check) → None,
+    #           second find_one (_unique_username "alice" taken) → existing record,
+    #           third find_one (_unique_username "alice1" free) → None,
+    #           fourth find_one (OTP verification) → otp_record.
+    mock_db.users.find_one.side_effect = [
+        None,          # existing user by email — not found
+        {"_id": "x"}, # "alice" username already taken
+        None,          # "alice1" username is free
+    ]
+    mock_db.email_otps.find_one.return_value = otp_record
+
+    resp = _post_set_password(client, {
+        "email": "alice@example.com",
+        "password": "securepassword123",
+        "purpose": "signup",
+    })
+
+    assert resp.status_code == 200
+
+    # Extract the username that was actually persisted
+    call_args = mock_db.users.insert_one.call_args[0][0]
+    assert call_args["username"] == "alice1", (
+        f"Expected 'alice1' but got '{call_args['username']}'"
+    )
+
+
+@patch("routes.auth.db")
+def test_unique_username_no_collision(mock_db):
+    """_unique_username returns the base name unchanged when it is free."""
+    from routes.auth import _unique_username
+
+    mock_db.users.find_one.return_value = None
+    assert _unique_username("bob") == "bob"
+
+
+@patch("routes.auth.db")
+def test_unique_username_strips_at_sign(mock_db):
+    """_unique_username must strip '@' so the result cannot be parsed as email."""
+    from routes.auth import _unique_username
+
+    mock_db.users.find_one.return_value = None
+    result = _unique_username("user@domain")
+    assert "@" not in result
+
+
+@patch("routes.auth.db")
+def test_unique_username_increments_until_free(mock_db):
+    """_unique_username must keep incrementing the suffix until a slot is free."""
+    from routes.auth import _unique_username
+
+    # "carol" and "carol1" are taken; "carol2" is free
+    mock_db.users.find_one.side_effect = [
+        {"_id": "1"},  # "carol" taken
+        {"_id": "2"},  # "carol1" taken
+        None,          # "carol2" free
+    ]
+    assert _unique_username("carol") == "carol2"
