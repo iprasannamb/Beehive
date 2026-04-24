@@ -30,11 +30,11 @@ OTP_VERIFICATION_WINDOW_SECONDS = 600  # 10 minutes
 def _unique_username(base: str) -> str:
     """Return a username derived from *base* that does not already exist.
 
-    Strips any '@' character so the result can never be mistaken for an email
-    address by the login resolver, then appends an incrementing numeric suffix
-    until a free slot is found.
+    Strips any '@' or '$' characters so the result can never be mistaken for
+    an email address or trigger NoSQL injection checks, then appends an
+    incrementing numeric suffix until a free slot is found.
     """
-    base = base.replace("@", "")
+    base = base.replace("@", "").replace("$", "")
     candidate = base
     counter = 1
     while db.users.find_one({"username": candidate}):
