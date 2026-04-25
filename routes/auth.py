@@ -432,7 +432,7 @@ def google_auth():
 
         # Create a minimal Google-backed user (no local password)
         now_utc = datetime.now(timezone.utc)
-        google_username = _unique_username(name or email.split("@")[0])
+        google_username = _unique_username((name[:100] if name else None) or email.split("@")[0])
         result = db.users.insert_one({
             "email": email,
             "username": google_username,
