@@ -101,9 +101,19 @@ def initialize_text_index():
                 logger.info("Compound index created on user_id and created_at in image collection")
 
             # Add user collection indexes
-            if 'username_1' not in existing_user_indexes:
-                user_collection.create_index([('username', 1)], name='username_1')
-                logger.info("Index created on username in user collection")
+            # The username index MUST be unique to prevent race-condition duplicates.
+            # If an old non-unique index exists, drop it first so we can recreate
+            # it with unique=True.
+            if 'username_1' in existing_user_indexes:
+                if not existing_user_indexes['username_1'].get('unique'):
+                    user_collection.drop_index('username_1')
+                    logger.info("Dropped non-unique username_1 index to replace with unique index")
+                    user_collection.create_index([('username', 1)], name='username_1', unique=True)
+                    logger.info("Unique index created on username in user collection")
+                # else: already unique — nothing to do
+            else:
+                user_collection.create_index([('username', 1)], name='username_1', unique=True)
+                logger.info("Unique index created on username in user collection")
             if 'email_1' not in existing_user_indexes:
                 user_collection.create_index([('email', 1)], name='email_1')
                 logger.info("Index created on email in user collection")
