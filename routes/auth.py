@@ -4,6 +4,7 @@ import secrets
 import bcrypt
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import pymongo.errors
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -348,14 +349,21 @@ def set_password():
 
         now_utc = datetime.now(timezone.utc)
         username = _unique_username(email.split("@")[0])
-        user_id = db.users.insert_one({
-            "email": email,
-            "username": username,
-            "password": hashed,
-            "role": role,
-            "created_at": now_utc,
-            "last_active": now_utc
-        }).inserted_id
+        try:
+            user_id = db.users.insert_one({
+                "email": email,
+                "username": username,
+                "password": hashed,
+                "role": role,
+                "created_at": now_utc,
+                "last_active": now_utc
+            }).inserted_id
+        except pymongo.errors.DuplicateKeyError:
+            current_app.logger.warning(
+                "DuplicateKeyError on signup for email=%s username=%s — race condition",
+                email, username,
+            )
+            return jsonify({"error": "Username already taken. Please try again."}), 409
 
         # Cleanup OTPs
         db.email_otps.delete_many({"email": email})
@@ -433,16 +441,23 @@ def google_auth():
         # Create a minimal Google-backed user (no local password)
         now_utc = datetime.now(timezone.utc)
         google_username = _unique_username(name or email.split("@")[0])
-        result = db.users.insert_one({
-            "email": email,
-            "username": google_username,
-            "password": None,
-            "role": role,
-            "provider": "google",
-            "google_id": sub,
-            "created_at": now_utc,
-            "last_active": now_utc
-        })
+        try:
+            result = db.users.insert_one({
+                "email": email,
+                "username": google_username,
+                "password": None,
+                "role": role,
+                "provider": "google",
+                "google_id": sub,
+                "created_at": now_utc,
+                "last_active": now_utc
+            })
+        except pymongo.errors.DuplicateKeyError:
+            current_app.logger.warning(
+                "DuplicateKeyError on Google signup for email=%s username=%s — race condition",
+                email, google_username,
+            )
+            return jsonify({"error": "Username conflict during signup. Please try again."}), 409
         user_id = str(result.inserted_id)
     else:
         user_id = str(user["_id"])
