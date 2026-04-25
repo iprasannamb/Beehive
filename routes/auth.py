@@ -35,7 +35,7 @@ def _unique_username(base: str) -> str:
     an email address or trigger NoSQL injection checks, then appends an
     incrementing numeric suffix until a free slot is found.
     """
-    base = base.replace("@", "").replace("$", "")
+    base = base.replace("@", "").replace("$", "").strip()
     candidate = base
     counter = 1
     while db.users.find_one({"username": candidate}):
