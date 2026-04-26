@@ -222,14 +222,21 @@ def complete_signup():
     )
 
     now_utc = datetime.now(timezone.utc)
-    result = db.users.insert_one({
-        "email": email,
-        "username": username,
-        "password": hashed_password,
-        "role": role,
-        "created_at": now_utc,
-        "last_active": now_utc
-    })
+    try:
+        result = db.users.insert_one({
+            "email": email,
+            "username": username,
+            "password": hashed_password,
+            "role": role,
+            "created_at": now_utc,
+            "last_active": now_utc
+        })
+    except pymongo.errors.DuplicateKeyError:
+        current_app.logger.warning(
+            "DuplicateKeyError on complete-signup for email=%s username=%s — race condition",
+            email, username,
+        )
+        return jsonify({"error": "Username already taken. Please choose a different one."}), 409
     db.email_otps.delete_many({"email": email})
 
     token = create_access_token(
