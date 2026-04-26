@@ -27,6 +27,11 @@ auth_bp = Blueprint("auth", __name__)
 
 OTP_VERIFICATION_WINDOW_SECONDS = 600  # 10 minutes
 
+# Maximum sequential suffix attempts in _unique_username before a random fallback is used.
+_MAX_USERNAME_SEQUENTIAL = 10
+# Maximum full retries (generate + insert) for auto-assigned usernames before giving up.
+_MAX_SIGNUP_RETRIES = 3
+
 
 def _unique_username(base: str) -> str:
     """Return a username derived from *base* that does not already exist.
@@ -34,14 +39,19 @@ def _unique_username(base: str) -> str:
     Strips any '@' or '$' characters so the result can never be mistaken for
     an email address or trigger NoSQL injection checks, then appends an
     incrementing numeric suffix until a free slot is found.
+
+    At most _MAX_USERNAME_SEQUENTIAL sequential candidates are checked; if all
+    are taken a random 7-digit suffix is used to break the collision cluster
+    without spinning indefinitely. The DB unique index is the final backstop.
     """
     base = base.replace("@", "").replace("$", "").strip()
     candidate = base
-    counter = 1
-    while db.users.find_one({"username": candidate}):
+    for counter in range(1, _MAX_USERNAME_SEQUENTIAL + 1):
+        if not db.users.find_one({"username": candidate}):
+            return candidate
         candidate = f"{base}{counter}"
-        counter += 1
-    return candidate
+    # Sequential slots all taken — use a random suffix to avoid an unbounded loop.
+    return f"{base}{secrets.randbelow(9_999_999) + 1}"
 
 
 def _validate_otp_verification(email: str):
@@ -355,22 +365,26 @@ def set_password():
         role = "admin" if is_admin_email(email) else "user"
 
         now_utc = datetime.now(timezone.utc)
-        username = _unique_username(email.split("@")[0])
-        try:
-            user_id = db.users.insert_one({
-                "email": email,
-                "username": username,
-                "password": hashed,
-                "role": role,
-                "created_at": now_utc,
-                "last_active": now_utc
-            }).inserted_id
-        except pymongo.errors.DuplicateKeyError:
-            current_app.logger.warning(
-                "DuplicateKeyError on signup for email=%s username=%s — race condition",
-                email, username,
-            )
-            return jsonify({"error": "Username already taken. Please try again."}), 409
+        user_id = None
+        for _attempt in range(_MAX_SIGNUP_RETRIES):
+            username = _unique_username(email.split("@")[0])
+            try:
+                user_id = db.users.insert_one({
+                    "email": email,
+                    "username": username,
+                    "password": hashed,
+                    "role": role,
+                    "created_at": now_utc,
+                    "last_active": now_utc
+                }).inserted_id
+                break  # success
+            except pymongo.errors.DuplicateKeyError:
+                current_app.logger.warning(
+                    "DuplicateKeyError on signup attempt %d/%d for email=%s username=%s",
+                    _attempt + 1, _MAX_SIGNUP_RETRIES, email, username,
+                )
+                if _attempt == _MAX_SIGNUP_RETRIES - 1:
+                    return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
 
         # Cleanup OTPs
         db.email_otps.delete_many({"email": email})
@@ -447,24 +461,29 @@ def google_auth():
 
         # Create a minimal Google-backed user (no local password)
         now_utc = datetime.now(timezone.utc)
-        google_username = _unique_username(name or email.split("@")[0])
-        try:
-            result = db.users.insert_one({
-                "email": email,
-                "username": google_username,
-                "password": None,
-                "role": role,
-                "provider": "google",
-                "google_id": sub,
-                "created_at": now_utc,
-                "last_active": now_utc
-            })
-        except pymongo.errors.DuplicateKeyError:
-            current_app.logger.warning(
-                "DuplicateKeyError on Google signup for email=%s username=%s — race condition",
-                email, google_username,
-            )
-            return jsonify({"error": "Username conflict during signup. Please try again."}), 409
+        base_name = name or email.split("@")[0]
+        result = None
+        for _attempt in range(_MAX_SIGNUP_RETRIES):
+            google_username = _unique_username(base_name)
+            try:
+                result = db.users.insert_one({
+                    "email": email,
+                    "username": google_username,
+                    "password": None,
+                    "role": role,
+                    "provider": "google",
+                    "google_id": sub,
+                    "created_at": now_utc,
+                    "last_active": now_utc
+                })
+                break  # success
+            except pymongo.errors.DuplicateKeyError:
+                current_app.logger.warning(
+                    "DuplicateKeyError on Google signup attempt %d/%d for email=%s username=%s",
+                    _attempt + 1, _MAX_SIGNUP_RETRIES, email, google_username,
+                )
+                if _attempt == _MAX_SIGNUP_RETRIES - 1:
+                    return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
         user_id = str(result.inserted_id)
     else:
         user_id = str(user["_id"])
