@@ -1,6 +1,7 @@
 import os
 from dotenv import find_dotenv, load_dotenv
 from pymongo import MongoClient, TEXT
+from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 from utils.logger import Logger
 
 logger = Logger.get_logger("databaseConfig")
@@ -106,14 +107,45 @@ def initialize_text_index():
             # it with unique=True.
             if 'username_1' in existing_user_indexes:
                 if not existing_user_indexes['username_1'].get('unique'):
-                    user_collection.drop_index('username_1')
-                    logger.info("Dropped non-unique username_1 index to replace with unique index")
-                    user_collection.create_index([('username', 1)], name='username_1', unique=True)
-                    logger.info("Unique index created on username in user collection")
+                    # Safe upgrade: create a temporary unique index FIRST to
+                    # detect any duplicate data before we drop anything.
+                    # If duplicates exist, create_index raises DuplicateKeyError
+                    # and the original index is left completely untouched.
+                    try:
+                        user_collection.create_index(
+                            [('username', 1)],
+                            name='username_1_unique_tmp',
+                            unique=True,
+                        )
+                        # No duplicates confirmed — safe to swap.
+                        user_collection.drop_index('username_1')
+                        user_collection.drop_index('username_1_unique_tmp')
+                        user_collection.create_index(
+                            [('username', 1)], name='username_1', unique=True
+                        )
+                        logger.info("Upgraded username_1 index to unique=True")
+                    except MongoDuplicateKeyError:
+                        # Temp creation failed; old non-unique index is still in place.
+                        # Clean up the temp index just in case it was partially recorded.
+                        try:
+                            user_collection.drop_index('username_1_unique_tmp')
+                        except Exception:
+                            pass
+                        logger.error(
+                            "Cannot upgrade username index to unique: duplicate usernames "
+                            "exist in the collection. Manual deduplication is required "
+                            "before uniqueness can be enforced."
+                        )
                 # else: already unique — nothing to do
             else:
-                user_collection.create_index([('username', 1)], name='username_1', unique=True)
-                logger.info("Unique index created on username in user collection")
+                try:
+                    user_collection.create_index([('username', 1)], name='username_1', unique=True)
+                    logger.info("Unique index created on username in user collection")
+                except MongoDuplicateKeyError:
+                    logger.error(
+                        "Cannot create unique username index: duplicate usernames exist. "
+                        "Manual deduplication required."
+                    )
             if 'email_1' not in existing_user_indexes:
                 user_collection.create_index([('email', 1)], name='email_1')
                 logger.info("Index created on email in user collection")
