@@ -92,16 +92,24 @@ const Dashboard = () => {
 
 const debouncedFilterUser = useDebounce(filterUser, 400);
 
-  useEffect(() => {
-    // if user filter provided in query string, pre-populate
-    const params = new URLSearchParams(location.search);
-    const userParam = params.get('user');
-    if (userParam) {
-      setFilterUser(userParam);
-    }
-    fetchDashboardData();
-  }, [location.search,sortOption,filterFromDate,filterToDate,debouncedFilterUser,page,]);
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const userParam = params.get("user");
 
+  if (userParam && userParam !== filterUser) {
+    setFilterUser(userParam);
+  }
+}, [location.search]);
+
+useEffect(() => {
+  fetchDashboardData();
+}, [
+  sortOption,
+  filterFromDate,
+  filterToDate,
+  debouncedFilterUser,
+  page,
+]);
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
