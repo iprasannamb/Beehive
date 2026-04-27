@@ -76,6 +76,22 @@ const Dashboard = () => {
 
   const location = useLocation();
 
+  function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+const debouncedFilterUser = useDebounce(filterUser, 400);
+
   useEffect(() => {
     // if user filter provided in query string, pre-populate
     const params = new URLSearchParams(location.search);
@@ -84,7 +100,7 @@ const Dashboard = () => {
       setFilterUser(userParam);
     }
     fetchDashboardData();
-  }, [location.search,sortOption,filterFromDate,filterToDate,filterUser,page,]);
+  }, [location.search,sortOption,filterFromDate,filterToDate,debouncedFilterUser,page,]);
 
   const fetchDashboardData = async () => {
     try {
