@@ -60,6 +60,21 @@ const StatCard = ({
   </div>
 );
 
+  function useDebounce<T>(value: T, delay: number): T {
+  const [debounceValue, setDebounceValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebounceValue(value);
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return debounceValue;
+}
+
+
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,20 +90,6 @@ const Dashboard = () => {
   const limit = 10;
 
   const location = useLocation();
-
-  function useDebounce<T>(value: T, delay: number): T {
-  const [debounceValue, setDebounceValue] = useState(value);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebounceValue(value);
-    }, delay);
-
-    return () => clearTimeout(timeout);
-  }, [value, delay]);
-
-  return debounceValue;
-}
 
 const debouncedFilterUser = useDebounce(filterUser, 400);
 
