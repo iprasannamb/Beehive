@@ -77,17 +77,17 @@ const Dashboard = () => {
   const location = useLocation();
 
   function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
+  const [debounceValue, setDebounceValue] = useState(value);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      setDebouncedValue(value);
+      setDebounceValue(value);
     }, delay);
 
     return () => clearTimeout(timeout);
   }, [value, delay]);
 
-  return debouncedValue;
+  return debounceValue;
 }
 
 const debouncedFilterUser = useDebounce(filterUser, 400);
