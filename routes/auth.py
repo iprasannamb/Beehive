@@ -40,18 +40,25 @@ def _unique_username(base: str) -> str:
     an email address or trigger NoSQL injection checks, then appends an
     incrementing numeric suffix until a free slot is found.
 
-    At most _MAX_USERNAME_SEQUENTIAL sequential candidates are checked; if all
-    are taken a random 7-digit suffix is used to break the collision cluster
-    without spinning indefinitely. The DB unique index is the final backstop.
+    At most _MAX_USERNAME_SEQUENTIAL sequential candidates are checked
+    (bare *base*, then *base1* … *base_MAX*); if all are taken a hex suffix
+    is used to break the collision cluster without spinning indefinitely.
+    The DB unique index is the final backstop against races.
     """
-    base = base.replace("@", "").replace("$", "").strip()
+    # Default to "user" so an all-symbol prefix (e.g. "@") never yields an
+    # empty string, which would produce an unusable username.
+    base = base.replace("@", "").replace("$", "").strip() or "user"
     candidate = base
     for counter in range(1, _MAX_USERNAME_SEQUENTIAL + 1):
         if not db.users.find_one({"username": candidate}):
             return candidate
         candidate = f"{base}{counter}"
-    # Sequential slots all taken — use a random suffix to avoid an unbounded loop.
-    return f"{base}{secrets.randbelow(9_999_999) + 1}"
+    # Check the final sequential candidate (base_MAX) before giving up.
+    if not db.users.find_one({"username": candidate}):
+        return candidate
+    # All sequential slots taken — use a hex suffix to minimise collision risk
+    # (avoids the small-integer overlap that a randbelow(10) fallback would have).
+    return f"{base}{secrets.token_hex(4)}"
 
 
 def _validate_otp_verification(email: str):
@@ -241,13 +248,14 @@ def complete_signup():
             "created_at": now_utc,
             "last_active": now_utc
         })
-    except pymongo.errors.DuplicateKeyError:
+    except pymongo.errors.DuplicateKeyError as e:
         current_app.logger.warning(
             "DuplicateKeyError on complete-signup for email=%s username=%s — race condition",
             email, username,
         )
+        if "email" in str(e):
+            return jsonify({"error": "Email already registered"}), 409
         return jsonify({"error": "Username already taken. Please choose a different one."}), 409
-    db.email_otps.delete_many({"email": email})
 
     token = create_access_token(
         user_id=str(result.inserted_id),
@@ -378,11 +386,13 @@ def set_password():
                     "last_active": now_utc
                 }).inserted_id
                 break  # success
-            except pymongo.errors.DuplicateKeyError:
+            except pymongo.errors.DuplicateKeyError as e:
                 current_app.logger.warning(
                     "DuplicateKeyError on signup attempt %d/%d for email=%s username=%s",
                     _attempt + 1, _MAX_SIGNUP_RETRIES, email, username,
                 )
+                if "email" in str(e):
+                    return jsonify({"error": "Email already registered"}), 409
                 if _attempt == _MAX_SIGNUP_RETRIES - 1:
                     return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
 
@@ -477,11 +487,19 @@ def google_auth():
                     "last_active": now_utc
                 })
                 break  # success
-            except pymongo.errors.DuplicateKeyError:
+            except pymongo.errors.DuplicateKeyError as e:
                 current_app.logger.warning(
                     "DuplicateKeyError on Google signup attempt %d/%d for email=%s username=%s",
                     _attempt + 1, _MAX_SIGNUP_RETRIES, email, google_username,
                 )
+                if "email" in str(e):
+                    user = db.users.find_one({"email": email})
+                    if user:
+                        return jsonify({
+                            "access_token": create_access_token(user_id=str(user["_id"]), role=user.get("role", "user")),
+                            "role": user.get("role", "user")
+                        }), 200
+                    return jsonify({"error": "Failed to authenticate"}), 500
                 if _attempt == _MAX_SIGNUP_RETRIES - 1:
                     return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
         user_id = str(result.inserted_id)

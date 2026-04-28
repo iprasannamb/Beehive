@@ -146,9 +146,39 @@ def initialize_text_index():
                         "Cannot create unique username index: duplicate usernames exist. "
                         "Manual deduplication required."
                     )
-            if 'email_1' not in existing_user_indexes:
-                user_collection.create_index([('email', 1)], name='email_1')
-                logger.info("Index created on email in user collection")
+            if 'email_1' in existing_user_indexes:
+                if not existing_user_indexes['email_1'].get('unique'):
+                    try:
+                        user_collection.create_index(
+                            [('email', 1)],
+                            name='email_1_unique_tmp',
+                            unique=True,
+                        )
+                        user_collection.drop_index('email_1')
+                        user_collection.drop_index('email_1_unique_tmp')
+                        user_collection.create_index(
+                            [('email', 1)], name='email_1', unique=True
+                        )
+                        logger.info("Upgraded email_1 index to unique=True")
+                    except MongoDuplicateKeyError:
+                        try:
+                            user_collection.drop_index('email_1_unique_tmp')
+                        except Exception:
+                            pass
+                        logger.error(
+                            "Cannot upgrade email index to unique: duplicate emails "
+                            "exist in the collection. Manual deduplication is required "
+                            "before uniqueness can be enforced."
+                        )
+            else:
+                try:
+                    user_collection.create_index([('email', 1)], name='email_1', unique=True)
+                    logger.info("Unique index created on email in user collection")
+                except MongoDuplicateKeyError:
+                    logger.error(
+                        "Cannot create unique email index: duplicate emails exist. "
+                        "Manual deduplication required."
+                    )
         except Exception as ie:
             logger.error(f"Error creating collection indexes: {ie}")
     except Exception as e:
