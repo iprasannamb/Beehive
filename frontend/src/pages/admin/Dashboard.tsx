@@ -60,7 +60,7 @@ const StatCard = ({
   </div>
 );
 
-  function useDebounce<T>(value: T, delay: number): T {
+function useDebounce<T>(value: T, delay: number): T {
   const [debounceValue, setDebounceValue] = useState(value);
 
   useEffect(() => {
@@ -91,26 +91,24 @@ const Dashboard = () => {
 
   const location = useLocation();
 
-const debouncedFilterUser = useDebounce(filterUser, 400);
+  const debouncedFilterUser = useDebounce(filterUser, 400);
 
-useEffect(() => {
-  const params = new URLSearchParams(location.search);
-  const userParam = params.get("user");
-
-  if (userParam && userParam !== filterUser) {
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const userParam = params.get("user") || "";
     setFilterUser(userParam);
-  }
-}, [location.search]);
+  }, [location.search]);
 
-useEffect(() => {
-  fetchDashboardData();
-}, [
-  sortOption,
-  filterFromDate,
-  filterToDate,
-  debouncedFilterUser,
-  page,
-]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, [
+    sortOption,
+    filterFromDate,
+    filterToDate,
+    debouncedFilterUser,
+    page,
+  ]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
