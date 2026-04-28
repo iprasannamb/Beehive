@@ -434,7 +434,7 @@ def set_password():
                     "DuplicateKeyError on signup attempt %d/%d for email=%s username=%s",
                     _attempt + 1, _MAX_SIGNUP_RETRIES, email, username,
                 )
-                if "email" in str(e):
+                if e.details and e.details.get("keyPattern", {}).get("email"):
                     return jsonify({"error": "Email already registered"}), 409
                 if _attempt == _MAX_SIGNUP_RETRIES - 1:
                     return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
