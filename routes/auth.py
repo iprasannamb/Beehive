@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime, timedelta, timezone
+import re
 import secrets
 import bcrypt
 from google.oauth2 import id_token
@@ -43,24 +44,34 @@ def _unique_username(base: str) -> str:
     an email address or trigger NoSQL injection checks, then appends an
     incrementing numeric suffix until a free slot is found.
 
-    At most _MAX_USERNAME_SEQUENTIAL sequential candidates are checked
-    (bare *base*, then *base1* … *base_MAX*); if all are taken a hex suffix
-    is used to break the collision cluster without spinning indefinitely.
-    The DB unique index is the final backstop against races.
+    A single regex query fetches all taken variants (base, base1 … baseN) so
+    the suffix search is done in-memory without extra round-trips. Falls back
+    to a hex suffix if every sequential slot is occupied. The DB unique index
+    is the final backstop against races.
     """
     # Default to "user" so an all-symbol prefix (e.g. "@") never yields an
     # empty string, which would produce an unusable username.
     base = base.replace("@", "").replace("$", "").strip() or "user"
-    candidate = base
+
+    # Fetch every username that matches base or base<digits>.
+    pattern = f"^{re.escape(base)}[0-9]*$"
+    taken = {
+        doc["username"]
+        for doc in db.users.find(
+            {"username": {"$regex": pattern}},
+            {"username": 1, "_id": 0},
+        )
+    }
+
+    # Try the bare base first, then base1 … base_MAX in-memory.
+    if base not in taken:
+        return base
     for counter in range(1, _MAX_USERNAME_SEQUENTIAL + 1):
-        if not db.users.find_one({"username": candidate}):
-            return candidate
         candidate = f"{base}{counter}"
-    # Check the final sequential candidate (base_MAX) before giving up.
-    if not db.users.find_one({"username": candidate}):
-        return candidate
-    # All sequential slots taken — use a hex suffix to minimise collision risk
-    # (avoids the small-integer overlap that a randbelow(10) fallback would have).
+        if candidate not in taken:
+            return candidate
+
+    # All sequential slots occupied — hex suffix to minimise collision risk.
     return f"{base}{secrets.token_hex(4)}"
 
 
