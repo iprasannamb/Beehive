@@ -298,7 +298,7 @@ def complete_signup():
             "DuplicateKeyError on complete-signup for email=%s username=%s — race condition",
             email, username,
         )
-        if "email" in str(e):
+        if e.details and e.details.get("keyPattern", {}).get("email"):
             return jsonify({"error": "Email already registered"}), 409
         return jsonify({"error": "Username already taken. Please choose a different one."}), 409
 
