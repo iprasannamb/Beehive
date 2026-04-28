@@ -539,7 +539,7 @@ def google_auth():
                     "DuplicateKeyError on Google signup attempt %d/%d for email=%s username=%s",
                     _attempt + 1, _MAX_SIGNUP_RETRIES, email, google_username,
                 )
-                if "email" in str(e):
+                if e.details and e.details.get("keyPattern", {}).get("email"):
                     user = db.users.find_one({"email": email})
                     if user:
                         return jsonify({
