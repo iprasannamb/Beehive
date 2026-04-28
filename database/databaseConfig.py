@@ -147,7 +147,7 @@ def initialize_text_index():
                         "Manual deduplication required."
                     )
             if 'email_1' not in existing_user_indexes:
-                user_collection.create_index([('email', 1)], name='email_1')
+                user_collection.create_index([('email', 1)], name='email_1', unique=True)
                 logger.info("Index created on email in user collection")
         except Exception as ie:
             logger.error(f"Error creating collection indexes: {ie}")
