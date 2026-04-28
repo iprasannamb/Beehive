@@ -396,8 +396,6 @@ def set_password():
         current_app.logger.warning("SET PASSWORD VALIDATION ERROR")
         return jsonify({"error": str(e)}), 400
 
-    if purpose not in ("signup", "reset"):
-        return jsonify({"error": "Invalid purpose. Must be 'signup' or 'reset'."}), 400
 
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
@@ -440,6 +438,10 @@ def set_password():
                     return jsonify({"error": "Email already registered"}), 409
                 if _attempt == _MAX_SIGNUP_RETRIES - 1:
                     return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
+
+        if user_id is None:
+            # All retry attempts exhausted without a successful insert.
+            return jsonify({"error": "Could not assign a unique username. Please try again."}), 409
 
         # Cleanup OTPs
         db.email_otps.delete_many({"email": email})
