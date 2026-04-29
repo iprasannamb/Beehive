@@ -157,10 +157,10 @@ def initialize_text_index():
                             unique=True,
                         )
                         user_collection.drop_index('email_1')
-                        user_collection.drop_index('email_1_unique_tmp')
                         user_collection.create_index(
                             [('email', 1)], name='email_1', unique=True
                         )
+                        user_collection.drop_index('email_1_unique_tmp')
                         logger.info("Upgraded email_1 index to unique=True")
                     except MongoDuplicateKeyError:
                         try:
