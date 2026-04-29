@@ -119,10 +119,10 @@ def initialize_text_index():
                         )
                         # No duplicates confirmed — safe to swap.
                         user_collection.drop_index('username_1')
-                        user_collection.drop_index('username_1_unique_tmp')
                         user_collection.create_index(
                             [('username', 1)], name='username_1', unique=True
                         )
+                        user_collection.drop_index('username_1_unique_tmp')
                         logger.info("Upgraded username_1 index to unique=True")
                     except MongoDuplicateKeyError:
                         # Temp creation failed; old non-unique index is still in place.
