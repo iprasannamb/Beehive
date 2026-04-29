@@ -239,9 +239,9 @@ def test_unique_username_increments_until_free(mock_db):
     from routes.auth import _unique_username
 
     # "carol" and "carol1" are taken; "carol2" is free
-    mock_db.users.find_one.side_effect = [
-        {"_id": "1"},  # "carol" taken
-        {"_id": "2"},  # "carol1" taken
-        None,          # "carol2" free
+    # "carol" and "carol1" are taken; "carol2" is free
+    mock_db.users.find.return_value = [
+        {"username": "carol"},
+        {"username": "carol1"},
     ]
     assert _unique_username("carol") == "carol2"
