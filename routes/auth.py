@@ -44,7 +44,7 @@ def _unique_username(base: str) -> str:
     an email address or trigger NoSQL injection checks, then appends an
     incrementing numeric suffix until a free slot is found.
 
-    A single regex query fetches all taken variants (base, base1 … baseN) so
+    A single query using $in fetches all taken variants (base, base1 … baseN) so
     the suffix search is done in-memory without extra round-trips. Falls back
     to a hex suffix if every sequential slot is occupied. The DB unique index
     is the final backstop against races.
