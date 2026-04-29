@@ -54,11 +54,13 @@ def _unique_username(base: str) -> str:
     base = base.replace("@", "").replace("$", "").strip() or "user"
 
     # Fetch every username that matches base or base<digits>.
-    pattern = f"^{re.escape(base)}[0-9]*$"
+    # Define the specific candidates we want to check in-memory.
+    candidates = [base] + [f"{base}{i}" for i in range(1, _MAX_USERNAME_SEQUENTIAL + 1)]
+
     taken = {
         doc["username"]
         for doc in db.users.find(
-            {"username": {"$regex": pattern}},
+            {"username": {"$in": candidates}},
             {"username": 1, "_id": 0},
         )
     }
