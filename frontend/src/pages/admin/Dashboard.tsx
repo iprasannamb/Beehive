@@ -7,7 +7,7 @@ import {
   ChartBarIcon,
   MicrophoneIcon,
 } from '@heroicons/react/24/outline';
-
+import useDebounce from '../../hooks/useDebounce';
 // Types for the dashboard data
 interface DashboardStats {
   totalImages: number;
@@ -60,21 +60,6 @@ const StatCard = ({
   </div>
 );
 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounceValue, setDebounceValue] = useState(value);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebounceValue(value);
-    }, delay);
-
-    return () => clearTimeout(timeout);
-  }, [value, delay]);
-
-  return debounceValue;
-}
-
-
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,9 +67,7 @@ const Dashboard = () => {
 
   // sorting / filtering state
   const [sortOption, setSortOption] = useState<'date_desc'|'date_asc'|'user_asc'|'user_desc'>('date_desc');
-  const [filterUser, setFilterUser] = useState(() => {
-    return new URLSearchParams(window.location.search).get("user") || "";
-  });
+  const [filterUser, setFilterUser] = useState('');
   const [filterFromDate, setFilterFromDate] = useState('');
   const [filterToDate, setFilterToDate] = useState('');
   // pagination state
@@ -155,7 +138,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  },[sortOption, filterFromDate, filterToDate, debouncedFilterUser, page]);
+  },[sortOption, debouncedFromDate, debouncedToDate, debouncedFilterUser, page]);
 
   if (loading) {
     return (
