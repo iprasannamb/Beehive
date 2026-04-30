@@ -86,15 +86,6 @@ const Dashboard = () => {
     setFilterUser(userParam);
      setPage(1);
   }, [location.search]);
-  useEffect(() => {
-    fetchDashboardData();
-  }, [
-    sortOption,
-    debouncedFromDate,
-    debouncedToDate,
-    debouncedFilterUser,
-    page,
-  ]);
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -136,8 +127,10 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  },[sortOption, debouncedFromDate, debouncedToDate, debouncedFilterUser, page]);
-
+  },[sortOption, debouncedFromDate, debouncedToDate, debouncedFilterUser, page, limit]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
   if (loading) {
     return (
       <div className="py-8">
