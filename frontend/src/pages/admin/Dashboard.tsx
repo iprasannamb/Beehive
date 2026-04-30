@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiUrl } from '../../utils/api';
 import { getToken } from '../../utils/auth';
@@ -94,26 +94,27 @@ const Dashboard = () => {
   const location = useLocation();
 
   const debouncedFilterUser = useDebounce(filterUser, 400);
+  const debouncedFromDate = useDebounce(filterFromDate, 400);
+  const debouncedToDate = useDebounce(filterToDate, 400);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const userParam = params.get("user") || "";
     setFilterUser(userParam);
   }, [location.search]);
-
   useEffect(() => {
     fetchDashboardData();
   }, [
     sortOption,
-    filterFromDate,
-    filterToDate,
+    debouncedFromDate,
+    debouncedToDate,
     debouncedFilterUser,
     page,
   ]);
   useEffect(() => {
-  setPage(1);
-}, [debouncedFilterUser, sortOption, filterFromDate, filterToDate]);
-  const fetchDashboardData = async () => {
+    setPage(1);
+  }, [debouncedFilterUser, sortOption, debouncedFromDate, debouncedToDate]);
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -130,9 +131,9 @@ const Dashboard = () => {
       const qp = new URLSearchParams();
       qp.set("limit", String(limit));
       qp.set("page", String(page));
-      if (filterUser) qp.set('user', filterUser);
-      if (filterFromDate) qp.set('from', filterFromDate);
-      if (filterToDate) qp.set('to', filterToDate);
+      if (debouncedFilterUser) qp.set('user', debouncedFilterUser);
+      if (debouncedFromDate) qp.set('from', debouncedFromDate);
+      if (debouncedToDate) qp.set('to', debouncedToDate);
       if (sortOption) qp.set('sort', sortOption);
 
       const response = await fetch(apiUrl(`/api/admin/dashboard?${qp.toString()}`),{
@@ -154,7 +155,7 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  },[sortOption, filterFromDate, filterToDate, debouncedFilterUser, page]);
 
   if (loading) {
     return (
