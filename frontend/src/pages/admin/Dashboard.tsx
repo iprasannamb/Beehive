@@ -84,6 +84,7 @@ const Dashboard = () => {
     const params = new URLSearchParams(location.search);
     const userParam = params.get("user") || "";
     setFilterUser(userParam);
+     setPage(1);
   }, [location.search]);
   useEffect(() => {
     fetchDashboardData();
@@ -94,9 +95,6 @@ const Dashboard = () => {
     debouncedFilterUser,
     page,
   ]);
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedFilterUser, sortOption, debouncedFromDate, debouncedToDate]);
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -237,6 +235,7 @@ const Dashboard = () => {
                   value={filterUser}
                   onChange={(e) => {
                     setFilterUser(e.target.value);
+                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm w-40 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-400"
                 />
@@ -246,6 +245,7 @@ const Dashboard = () => {
                   value={filterFromDate}
                   onChange={(e) => {
                     setFilterFromDate(e.target.value);
+                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -255,6 +255,7 @@ const Dashboard = () => {
                   value={filterToDate}
                   onChange={(e) => {
                     setFilterToDate(e.target.value);
+                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -277,6 +278,7 @@ const Dashboard = () => {
                         | "user_asc"
                         | "user_desc",
                     );
+                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 >
