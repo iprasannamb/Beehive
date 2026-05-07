@@ -82,9 +82,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const userParam = params.get("user") || "";
+    const userParam = params.get('user') || '';
     setFilterUser(userParam);
-     setPage(1);
+    setPage(1);
   }, [location.search]);
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -128,9 +128,15 @@ const Dashboard = () => {
       setLoading(false);
     }
   },[sortOption, debouncedFromDate, debouncedToDate, debouncedFilterUser, page, limit]);
-  useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+useEffect(() => {
+  const controller = new AbortController();
+
+  fetchDashboardData(controller.signal);
+
+  return () => {
+    controller.abort();
+  };
+}, [fetchDashboardData]);
   if (loading) {
     return (
       <div className="py-8">
@@ -228,7 +234,6 @@ const Dashboard = () => {
                   value={filterUser}
                   onChange={(e) => {
                     setFilterUser(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm w-40 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-400"
                 />
@@ -238,7 +243,6 @@ const Dashboard = () => {
                   value={filterFromDate}
                   onChange={(e) => {
                     setFilterFromDate(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -248,7 +252,6 @@ const Dashboard = () => {
                   value={filterToDate}
                   onChange={(e) => {
                     setFilterToDate(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -271,7 +274,6 @@ const Dashboard = () => {
                         | "user_asc"
                         | "user_desc",
                     );
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 >
