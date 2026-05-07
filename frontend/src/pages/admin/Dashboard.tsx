@@ -86,7 +86,10 @@ const Dashboard = () => {
     setFilterUser(userParam);
     setPage(1);
   }, [location.search]);
-  const fetchDashboardData = useCallback(async () => {
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilterUser, debouncedFromDate, debouncedToDate, sortOption]);
+  const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
