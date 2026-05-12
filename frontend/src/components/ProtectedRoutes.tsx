@@ -97,35 +97,53 @@ export const ProtectedMedia = ({ filename, isPdf = false, className = '', alt = 
 
 export const ProtectedAudio = ({ filename, className = '', onEnded }: ProtectedAudioProps) => {
   const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let objectUrl: string | null = null;
+    const controller = new AbortController();
 
     const fetchAudio = async () => {
+      setSrc(null);
+      setError(false);
       try {
         const token = getToken();
-        const response = await fetch(encodeURI(apiUrl(`/audio/${filename}`)), {
+        const response = await fetch(apiUrl(`/api/audio/${encodeURIComponent(filename)}`), {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-          credentials: 'include'
+          credentials: 'include',
+          signal: controller.signal
         });
 
-        if (response.ok) {
-          const blob = await response.blob();
-          objectUrl = URL.createObjectURL(blob);
-          setSrc(objectUrl);
+        if (!response.ok) {
+          throw new Error('Failed to load audio (' + response.status + ')');
         }
+
+        const blob = await response.blob();
+        if (controller.signal.aborted) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
       } catch (error) {
-        console.error("Failed to load secure audio", error);
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        console.error('Failed to load secure audio', error);
+        setError(true);
       }
     };
 
-    fetchAudio();
+    if (filename) {
+      fetchAudio();
+    } else {
+      setSrc(null);
+      setError(false);
+    }
 
     return () => {
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [filename]);
 
+  if (error) return <div className="text-sm text-red-500 p-2">Failed to load secure audio.</div>;
   if (!src) return <div className="text-sm text-gray-500 p-2 animate-pulse">Loading secure audio...</div>;
 
   return (

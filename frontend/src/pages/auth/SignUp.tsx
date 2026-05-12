@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveToken } from "../../utils/auth";
 import { apiFetch } from "../../utils/apiFetch";
+import { requestOtp as requestOtpApi } from "./authApi";
 
 
 const SignUpPage = () => {

@@ -1,6 +1,7 @@
 import  { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../utils/apiFetch";
+import { requestOtp as requestOtpApi } from "./authApi";
 
 
 const ForgotPasswordPage = () => {
@@ -40,8 +41,8 @@ const ForgotPasswordPage = () => {
       });
 
       setStep("password");
-    } catch (err: any) {
-      setError(err.message || "Invalid or expired OTP");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Invalid or expired OTP");
     } finally {
       setLoading(false);
     }
@@ -67,8 +68,8 @@ const ForgotPasswordPage = () => {
       });
 
       navigate("/sign-in");
-    } catch (err: any) {
-      setError(err.message || "Failed to reset password");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
       setLoading(false);
     }
