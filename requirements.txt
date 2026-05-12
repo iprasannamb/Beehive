@@ -14,7 +14,7 @@ pymongo==4.11.0
 dnspython==2.7.0
 
 # Authentication & OAuth
-Authlib==1.6.9
+Authlib==1.6.11
 google-api-core==2.24.1
 google-api-python-client==2.160.0
 google-auth==2.38.0
@@ -26,18 +26,18 @@ oauthlib==3.2.2
 # HTTP & Networking
 requests==2.33.0
 requests-oauthlib==2.0.0
-urllib3==2.6.3
+urllib3==2.7.0
 httplib2==0.22.0
 certifi==2025.1.31
 charset-normalizer==3.4.1
 idna==3.10
 
 # Image processing & PDFs
-Pillow==12.1.1
+Pillow==12.2.0
 PyMuPDF==1.24.14
 
 # Utilities
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 cachetools==5.5.1
 proto-plus==1.26.0
 protobuf==5.29.6
