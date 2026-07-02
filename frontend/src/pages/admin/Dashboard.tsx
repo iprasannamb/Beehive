@@ -111,7 +111,7 @@ const Dashboard = () => {
       if (debouncedToDate) qp.set('to', debouncedToDate);
       if (sortOption) qp.set('sort', sortOption);
 
-      const response = await fetch(apiUrl(`/api/admin/dashboard?${qp.toString()}`),{
+      const response = await fetch(apiUrl(`/api/admin/dashboard?${qp.toString()}`), { signal,
           method: 'GET',
           headers,
           credentials: 'include',
