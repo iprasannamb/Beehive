@@ -34,6 +34,8 @@ interface ApiUser {
   lastActive?: string;
   status?: string;
   image?: string;
+  isLocked?: boolean;
+  failedAttempts?: number;
 }
 
 const normalizeUser = (user: ApiUser): User => {
@@ -47,6 +49,8 @@ const normalizeUser = (user: ApiUser): User => {
     lastActive: user.lastActive || '',
     status: user.status || 'active',
     image: user.image || '',
+    isLocked: Boolean(user.isLocked),
+    failedAttempts: Number(user.failedAttempts) || 0,
   };
 };
 

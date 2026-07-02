@@ -4,6 +4,7 @@ import secrets
 import bcrypt
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from pymongo import ReturnDocument
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -25,6 +26,8 @@ from database.databaseConfig import beehive
 auth_bp = Blueprint("auth", __name__)
 
 OTP_VERIFICATION_WINDOW_SECONDS = 600  # 10 minutes
+OTP_MAX_VERIFY_ATTEMPTS = 5
+OTP_VERIFY_LOCKOUT_SECONDS = 300  # 5 minutes
 
 
 def _validate_otp_verification(email: str):
@@ -72,7 +75,9 @@ def create_email_otp(email: str) -> str:
     db.email_otps.insert_one({
         "email": email,
         "otp": otp,
-        "expires_at": expires_at
+        "expires_at": expires_at,
+        "failed_attempts": 0,
+        "locked_until": None,
         })
 
     return otp
@@ -102,6 +107,8 @@ def request_otp():
         return jsonify({"error": "Invalid purpose"}), 400
 
     otp = create_email_otp(email)
+    if current_app.debug:
+        current_app.logger.info("[OTP] %s %s: %s", purpose, email, otp)
 
     # send the OTP via email
     try:
@@ -135,28 +142,68 @@ def verify_otp():
             current_app.logger.warning("OTP validation error")
             return jsonify({"error": str(e)}), 400
 
-        record = db.email_otps.find_one({
-            "email": email,
-            "otp": str(otp)
-        })
+        record = db.email_otps.find_one(
+            {"email": email},
+            sort=[("expires_at", -1)],
+        )
 
         if not record:
             return jsonify({"error": "Invalid OTP"}), 400
 
+        now_utc = datetime.now(timezone.utc)
         expires_at = record["expires_at"]
-
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
+        locked_until = record.get("locked_until")
+        if locked_until and locked_until.tzinfo is None:
+            locked_until = locked_until.replace(tzinfo=timezone.utc)
 
-        if expires_at < datetime.now(timezone.utc):
+        if expires_at < now_utc:
             return jsonify({"error": "OTP expired"}), 400
+
+        if locked_until and locked_until > now_utc:
+            remaining = int((locked_until - now_utc).total_seconds() + 1)
+            return jsonify({
+                "error": "Too many invalid OTP attempts. Try again later.",
+                "locked": True,
+                "remaining_seconds": remaining,
+            }), 429
+
+        submitted_otp = str(otp)
+        stored_otp = str(record.get("otp", ""))
+        if submitted_otp != stored_otp:
+            updated_record = db.email_otps.find_one_and_update(
+                {"_id": record["_id"]},
+                {"$inc": {"failed_attempts": 1}},
+                return_document=ReturnDocument.AFTER,
+            )
+            failed_attempts = int((updated_record or {}).get("failed_attempts", 0))
+            if failed_attempts >= OTP_MAX_VERIFY_ATTEMPTS:
+                db.email_otps.update_one(
+                    {"_id": record["_id"]},
+                    {"$set": {"locked_until": now_utc + timedelta(seconds=OTP_VERIFY_LOCKOUT_SECONDS)}},
+                )
+                return jsonify({
+                    "error": "Too many invalid OTP attempts. Try again later.",
+                    "locked": True,
+                    "remaining_seconds": OTP_VERIFY_LOCKOUT_SECONDS,
+                }), 429
+
+            return jsonify({"error": "Invalid OTP"}), 400
 
         # Mark email as verified instead of deleting
         # This flag is checked by complete-signup to prevent OTP bypass
         # Use _id to target the exact validated record, not just email
         db.email_otps.update_one(
             {"_id": record["_id"]},
-            {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc)}},
+            {
+                "$set": {
+                    "verified": True,
+                    "verified_at": now_utc,
+                    "failed_attempts": 0,
+                    "locked_until": None,
+                }
+            },
         )
 
         return jsonify({"message": "OTP verified"}), 200

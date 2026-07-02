@@ -147,7 +147,7 @@ const UserUploads = () => {
   const handleDownload = async (filename: string, type: 'file' | 'audio' = 'file') => {
     try {
       // Audio uses /api/audio/, images use /api/files/
-      const endpoint = type === 'audio' ? '/audio/' + filename : '/api/files/' + filename;
+      const endpoint = type === 'audio' ? '/api/audio/' + encodeURIComponent(filename) : '/api/files/' + encodeURIComponent(filename);
 
       const response = await fetch(apiUrl(endpoint), {
         headers: { 'Authorization': `Bearer ${getToken()}` },

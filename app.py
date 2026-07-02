@@ -1,6 +1,5 @@
 from dotenv import load_dotenv
 load_dotenv()
-import json
 import base64
 import binascii
 import datetime
@@ -17,7 +16,6 @@ from utils.logger import logger as app_logger
 
 import fitz
 import google.generativeai as genai
-import logging
 try:
     import magic
 except ImportError:
@@ -40,9 +38,9 @@ from flask_mail import Mail
 from database.databaseConfig import (
     get_beehive_message_collection,
     get_beehive_notification_collection,
+    get_beehive_user_collection,
     initialize_text_index,
 )
-from database.databaseConfig import get_beehive_user_collection
 from database.userdatahandler import (
     delete_image,
     get_image_by_id,
