@@ -161,13 +161,20 @@ def verify_otp():
         if expires_at < now_utc:
             return jsonify({"error": "OTP expired"}), 400
 
-        if locked_until and locked_until > now_utc:
-            remaining = int((locked_until - now_utc).total_seconds() + 1)
-            return jsonify({
-                "error": "Too many invalid OTP attempts. Try again later.",
-                "locked": True,
-                "remaining_seconds": remaining,
-            }), 429
+        if locked_until:
+            if locked_until > now_utc:
+                remaining = int((locked_until - now_utc).total_seconds() + 1)
+                return jsonify({
+                    "error": "Too many invalid OTP attempts. Try again later.",
+                    "locked": True,
+                    "remaining_seconds": remaining,
+                }), 429
+            else:
+                # Lockout expired, reset failed attempts
+                db.email_otps.update_one(
+                    {"_id": record["_id"]},
+                    {"$set": {"failed_attempts": 0, "locked_until": None}}
+                )
 
         submitted_otp = str(otp)
         stored_otp = str(record.get("otp", ""))
