@@ -190,3 +190,84 @@ def test_verify_otp_invalid_otp_format(client):
     assert "error" in data
 
     assert data["error"] == "otp must be a valid integer"
+
+
+def test_verify_otp_lockout_expiry(client, mock_db):
+    """POST /api/auth/verify-otp - Lockout expired resets failed_attempts"""
+    email = "lockout_expire@example.com"
+    otp = "123456"
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=5)
+
+    # Insert locked OTP record where lockout has already expired (10 seconds ago)
+    locked_until = now - timedelta(seconds=10)
+    mock_db.email_otps.insert_one(
+        {
+            "email": email,
+            "otp": otp,
+            "expires_at": expires_at,
+            "failed_attempts": 5,
+            "locked_until": locked_until
+        }
+    )
+
+    # Try verifying with an incorrect OTP. Since the lockout is expired,
+    # the failed_attempts should be reset to 0, and then incremented to 1.
+    # The response should be "Invalid OTP" (400) rather than a "Too many invalid OTP attempts" (429).
+    response = client.post(
+        "/api/auth/verify-otp",
+        json={
+            "email": email,
+            "otp": "999999",  # incorrect
+        },
+    )
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data["error"] == "Invalid OTP"
+
+    # Verify database state: locked_until should be None, failed_attempts should be 1
+    updated_record = mock_db.email_otps.find_one({"email": email})
+    assert updated_record["locked_until"] is None
+    assert updated_record["failed_attempts"] == 1
+
+
+def test_verify_otp_lockout_expiry_correct_otp(client, mock_db):
+    """POST /api/auth/verify-otp - Correct OTP after lockout expired"""
+    email = "lockout_expire_correct@example.com"
+    otp = "123456"
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=5)
+
+    # Insert locked OTP record where lockout has already expired (10 seconds ago)
+    locked_until = now - timedelta(seconds=10)
+    mock_db.email_otps.insert_one(
+        {
+            "email": email,
+            "otp": otp,
+            "expires_at": expires_at,
+            "failed_attempts": 5,
+            "locked_until": locked_until
+        }
+    )
+
+    # Try verifying with the correct OTP. Since the lockout is expired,
+    # the request should succeed and verify the email.
+    response = client.post(
+        "/api/auth/verify-otp",
+        json={
+            "email": email,
+            "otp": otp,  # correct
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["message"] == "OTP verified"
+
+    # Verify database state: verified should be True
+    updated_record = mock_db.email_otps.find_one({"email": email})
+    assert updated_record["verified"] is True
+    assert updated_record["locked_until"] is None
+    assert updated_record["failed_attempts"] == 0
+

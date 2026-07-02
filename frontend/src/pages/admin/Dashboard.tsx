@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { apiUrl } from '../../utils/api';
 import { getToken } from '../../utils/auth';
@@ -7,7 +7,7 @@ import {
   ChartBarIcon,
   MicrophoneIcon,
 } from '@heroicons/react/24/outline';
-
+import useDebounce from '../../hooks/useDebounce';
 // Types for the dashboard data
 interface DashboardStats {
   totalImages: number;
@@ -76,17 +76,20 @@ const Dashboard = () => {
 
   const location = useLocation();
 
-  useEffect(() => {
-    // if user filter provided in query string, pre-populate
-    const params = new URLSearchParams(location.search);
-    const userParam = params.get('user');
-    if (userParam) {
-      setFilterUser(userParam);
-    }
-    fetchDashboardData();
-  }, [location.search,sortOption,filterFromDate,filterToDate,filterUser,page,]);
+  const debouncedFilterUser = useDebounce(filterUser, 400);
+  const debouncedFromDate = useDebounce(filterFromDate, 400);
+  const debouncedToDate = useDebounce(filterToDate, 400);
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const userParam = params.get('user') || '';
+    setFilterUser(userParam);
+    setPage(1);
+  }, [location.search]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilterUser, debouncedFromDate, debouncedToDate, sortOption]);
+  const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -103,12 +106,12 @@ const Dashboard = () => {
       const qp = new URLSearchParams();
       qp.set("limit", String(limit));
       qp.set("page", String(page));
-      if (filterUser) qp.set('user', filterUser);
-      if (filterFromDate) qp.set('from', filterFromDate);
-      if (filterToDate) qp.set('to', filterToDate);
+      if (debouncedFilterUser) qp.set('user', debouncedFilterUser);
+      if (debouncedFromDate) qp.set('from', debouncedFromDate);
+      if (debouncedToDate) qp.set('to', debouncedToDate);
       if (sortOption) qp.set('sort', sortOption);
 
-      const response = await fetch(apiUrl(`/api/admin/dashboard?${qp.toString()}`),{
+      const response = await fetch(apiUrl(`/api/admin/dashboard?${qp.toString()}`), { signal,
           method: 'GET',
           headers,
           credentials: 'include',
@@ -127,8 +130,16 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  },[sortOption, debouncedFromDate, debouncedToDate, debouncedFilterUser, page, limit]);
+useEffect(() => {
+  const controller = new AbortController();
 
+  fetchDashboardData(controller.signal);
+
+  return () => {
+    controller.abort();
+  };
+}, [fetchDashboardData]);
   if (loading) {
     return (
       <div className="py-8">
@@ -226,7 +237,6 @@ const Dashboard = () => {
                   value={filterUser}
                   onChange={(e) => {
                     setFilterUser(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm w-40 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 dark:placeholder-gray-400"
                 />
@@ -236,7 +246,6 @@ const Dashboard = () => {
                   value={filterFromDate}
                   onChange={(e) => {
                     setFilterFromDate(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -246,7 +255,6 @@ const Dashboard = () => {
                   value={filterToDate}
                   onChange={(e) => {
                     setFilterToDate(e.target.value);
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 />
@@ -269,7 +277,6 @@ const Dashboard = () => {
                         | "user_asc"
                         | "user_desc",
                     );
-                    setPage(1);
                   }}
                   className="px-3 py-2 border rounded-md text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                 >
