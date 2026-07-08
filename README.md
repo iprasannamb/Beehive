@@ -45,4 +45,4 @@ For instructions to configure and run this project locally, see the [setup.md](d
 
 If you use this work in your research, please cite the following publication:
 
-* Abdullah, M. F, Kwon, J., Bagwan, Gupta, I., Moxley, D., and Kathiravelu, P. **A Data Framework for Behavioral Health with Digitized Drawings and Photographs.** In _the 20th Annual IEEE International Systems Conference (SysCon)._ April 2026. (pp. 1-8). IEEE.
+* Abdullah, M. F., Kwon, J., Bagwan, A., Gupta, I., Moxley, D., and Kathiravelu, P. **A Data Framework for Behavioral Health with Digitized Drawings and Photographs.** In _the 20th Annual IEEE International Systems Conference (SysCon)._ April 2026. (pp. 1-8). IEEE. https://doi.org/10.1109/SysCon66367.2026.11503585
